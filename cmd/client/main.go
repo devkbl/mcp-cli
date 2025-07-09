@@ -14,9 +14,8 @@ func main() {
 	ctx := context.Background()
 	// basic http streaming client
 	// TODO: get from flags
-	transport, err := transport.NewStreamableHTTP(
-		"http://localhost:8080/mcp",
-	)
+	url := "http://localhost:8080/mcp"
+	transport, err := transport.NewStreamableHTTP(url)
 	if err != nil {
 		slog.Default().ErrorContext(ctx, "error creating StreamableHTTP transport", slog.Any("error", err))
 	}
@@ -32,6 +31,7 @@ func main() {
 	}()
 
 	// initialize client
+
 	initReq := mcp.InitializeRequest{}
 
 	_, err = mcpClient.Initialize(ctx, initReq)

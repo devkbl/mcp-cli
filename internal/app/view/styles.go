@@ -9,8 +9,9 @@ var (
 	// stylez specific to the focused column/list
 	focusedColumnStyle = lipgloss.NewStyle().
 				Padding(1, 2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("62"))
+				Height(10).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(lipgloss.Color("63"))
 
 	// stylez specific to our help text
 	helpStyle = lipgloss.NewStyle().
