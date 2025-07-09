@@ -29,7 +29,7 @@ func NewModel() Model {
 
 	// initialise client list
 	clientList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
-	clientList.Title = "MCP Clients"
+	clientList.Title = "mcp clients"
 	clientList.SetItems([]list.Item{
 		client{name: "test-client", description: "test, fake mcp client", url: "http://localhost:8080"},
 		client{name: "test-client-2", description: "test-2, fake mcp client", url: "http://localhost:8080"},
@@ -37,7 +37,7 @@ func NewModel() Model {
 
 	// initialize methods list
 	methodsList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
-	methodsList.Title = "Methods"
+	methodsList.Title = "methods"
 
 	// TODO: remove this
 	methodsList.SetItems([]list.Item{
@@ -67,8 +67,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		// set all list sizes
 		for i := 0; i < len(m.lists); i++ {
-			m.lists[i].SetHeight(msg.Height)
-			m.lists[i].SetWidth(msg.Width)
+			m.lists[i].SetHeight(msg.Height - 10)
+			m.lists[i].SetWidth(msg.Width - 4/2)
 		}
 	}
 	// pass update to inner list model
@@ -79,6 +79,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // update the view based on the current model state
 func (m Model) View() string {
-	// join multiple lists in the view using lipgloss, start with first
-	return lipgloss.JoinHorizontal(lipgloss.Left, m.lists[clients].View(), m.lists[methods].View(), m.lists[responses].View())
+	clientsView := m.lists[clients].View()
+	methodsView := m.lists[methods].View()
+	responsesView := m.lists[responses].View()
+
+	switch m.focused {
+	case clients:
+		return lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			focusedColumnStyle.Render(clientsView),
+			columnStyle.Render(methodsView),
+			columnStyle.Render(responsesView),
+		)
+	}
+
+	return "loading..."
 }
