@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	mcpClientLib "github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
+	"github.com/mark3labs/mcp-go/mcp"
 	mcp2 "github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -41,7 +42,7 @@ func NewModel() Model {
 	clientList.Title = "mcp clients"
 	clientList.SetItems([]list.Item{
 		clientItem{name: "test-client", description: "test, fake mcp client", url: "http://localhost:8080/mcp"},
-		clientItem{name: "not a real client", description: "this is actually not a real client", url: "nae url"},
+		clientItem{name: "not a real client", description: "this is actually not a real client"},
 	})
 
 	// TODO: intialize methods from server ?
@@ -50,8 +51,11 @@ func NewModel() Model {
 		c := client.(clientItem)
 		slog.Debug("client item", slog.Any("client name", c.name), slog.Any("description", c.description))
 		ctx := context.Background()
-		url := "http://localhost:8080/mcp"
-		transport, err := transport.NewStreamableHTTP(url)
+
+		if c.url == "" {
+			continue
+		}
+		transport, err := transport.NewStreamableHTTP(c.url)
 		if err != nil {
 			slog.Default().ErrorContext(ctx, "error creating StreamableHTTP transport", slog.Any("error", err))
 		}
@@ -82,6 +86,26 @@ func NewModel() Model {
 
 		c.client = mcpClient
 
+		// set method items on current list
+		methodsList := list.New([]list.Item{}, delegate, 0, 0)
+		methodsList.Title = "methods"
+
+		methodsList.SetItems([]list.Item{methodItem{name: "List Tools", description: "Lists all available tools from the MCP server", request: "tools/list"}})
+
+		// list the tools and build up 'method for them'
+
+		tools, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
+		if err != nil {
+			slog.ErrorContext(ctx, "error listing tools", slog.Any("err", err))
+		}
+
+		for _, tool := range tools.Tools {
+			method := methodItem{name: tool.Name, description: tool.Description, request: "tools/call", inputSchema: tool.InputSchema}
+			methodsList.InsertItem(len(methodsList.Items())+1, method)
+		}
+
+		c.methodItems = methodsList.Items()
+
 		// replace the current item with this one, with an initialized MCP client
 		clientList.SetItem(i, c)
 	}
@@ -92,10 +116,9 @@ func NewModel() Model {
 	methodsList := list.New([]list.Item{}, delegate, 0, 0)
 	methodsList.Title = "methods"
 
-	// TODO: remove this
-	methodsList.SetItems([]list.Item{
-		clientItem{name: "List Tools", description: "Lists all available tools from the MCP server", url: "no url"},
-	})
+	// methodsList.SetItems([]list.Item{
+	// 	methodItem{name: "List Tools", description: "Lists all available tools from the MCP server", request: "tools/list"},
+	// })
 
 	// initialize responses list
 	responsesList := list.New([]list.Item{}, delegate, 0, 0)
@@ -144,6 +167,11 @@ func (m *Model) ItemSelected() {
 		// get selected client
 		selected := m.lists[m.focused].SelectedItem().(clientItem)
 
+		// print method items
+		slog.Debug("item", slog.Any("item", selected.methodItems[0]))
+
+		m.lists[methods].SetItems(selected.methodItems)
+
 		slog.Debug("selected item", slog.Any("name", selected.name), slog.Any("url", selected.url))
 
 		// m.lists[methods].InsertItem(len(m.lists[methods].Items()), clientItem{name: "name", description: "desc", url: ""})
@@ -152,7 +180,7 @@ func (m *Model) ItemSelected() {
 	// TODO: switch case
 	if m.focused == methods {
 		// get selected method
-		selectedMethod := m.lists[m.focused].SelectedItem().(clientItem)
+		selectedMethod := m.lists[m.focused].SelectedItem().(methodItem)
 
 		selectedClient := m.lists[clients].SelectedItem().(clientItem)
 
@@ -164,13 +192,8 @@ func (m *Model) ItemSelected() {
 		slog.Debug("selected item from clients list", slog.Any("name", selectedClient.name))
 
 		// TODO: make this more 'discovered' from the methods lists, ie store the behaviour of a given method within the method
-		if selectedMethod.name == "List Tools" {
+		if selectedMethod.request == "tools/list" {
 			// actually invoke client
-
-			err := selectedMcpClient.Ping(context.TODO())
-			if err != nil {
-				slog.Error("error pinging MCP server from client", slog.Any("err", err))
-			}
 
 			slog.Default().Debug("invoked list tools method")
 
@@ -181,9 +204,33 @@ func (m *Model) ItemSelected() {
 
 			for _, tool := range tools.Tools {
 				slog.Debug("tool", slog.String("tool_name", tool.Name))
-				m.lists[responses].InsertItem(0, clientItem{name: tool.Name})
+				m.lists[responses].SetItems([]list.Item{clientItem{name: tool.Name}})
+			}
+		}
+
+		if selectedMethod.request == "tools/call" {
+			slog.Default().Debug("invoked tool call", slog.String("tool_name", selectedMethod.name))
+
+			// actually invoke the tool and get the response
+
+			req := mcp2.CallToolRequest{}
+			req.Params.Name = selectedMethod.name
+
+			// TODO: take in user input here
+			req.Params.Arguments = map[string]any{
+				"location": "uk",
 			}
 
+			resp, err := selectedMcpClient.CallTool(context.TODO(), req)
+			if err != nil {
+				slog.Default().Error("error invoking tool", slog.Any("tool_name", selectedMethod.name), slog.Any("err", err))
+			}
+
+			slog.Default().Debug("got response", slog.Any("response", resp.Content))
+
+			textResp := resp.Content[0].(mcp.TextContent)
+
+			m.lists[responses].SetItems([]list.Item{responseItem{title: selectedMethod.name, response: textResp.Text, contentType: textResp.Type}})
 		}
 	}
 }
