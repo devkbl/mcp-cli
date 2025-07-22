@@ -7,7 +7,7 @@ type clientItem struct {
 	name        string
 	description string
 	url         string
-	client      client.Client
+	client      *client.Client
 }
 
 // implement filter value to satisfy listitem interface
