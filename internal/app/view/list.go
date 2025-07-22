@@ -90,9 +90,9 @@ func NewModel() Model {
 
 	// TODO: remove this
 	methodsList.SetItems([]list.Item{
-		clientItem{name: "test-method", description: "test fake method", url: "no url"},
-		clientItem{name: "test-method-2", description: "asdsadasdasd", url: "no url"},
+		clientItem{name: "List Tools", description: "Lists all available tools from the MCP server", url: "no url"},
 	})
+
 	// initialize responses list
 	responsesList := list.New([]list.Item{}, delegate, 0, 0)
 	responsesList.Title = "responses"
@@ -129,6 +129,16 @@ func (m *Model) Prev() {
 	m.focused--
 }
 
+// ItemSelected handles what to do if a given item is selected
+func (m *Model) ItemSelected() {
+	// if we select a given client, populate the methods list
+	if m.focused == clients {
+		// TODO: dont add list tools here, every MCP server must expose ListTools, so this should always be populated
+		// TODO: create a new methodItem struct
+		m.lists[methods].InsertItem(len(m.lists[methods].Items()), clientItem{name: "name", description: "desc", url: ""})
+	}
+}
+
 // initialize the model
 func (m Model) Init() tea.Cmd {
 	return nil
@@ -146,6 +156,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "enter":
+			m.ItemSelected()
+			return m, nil
 		case "left", "h":
 			m.Prev()
 			return m, nil
@@ -177,6 +190,7 @@ func (m Model) View() string {
 			columnStyle.Render(responsesView),
 		)
 	case methods:
+		slog.Debug("methods selected")
 		return lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			columnStyle.Render(clientsView),
